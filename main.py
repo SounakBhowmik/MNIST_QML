@@ -28,7 +28,7 @@ from Models import QConv2D_AE, Q_linear
 # Hyperparameters
 batch_size = 64
 learning_rate = 0.001
-num_epochs = 10
+num_epochs = 100
 
 # Load the dataset
 def load_mnist_from_csv(csv_path):
@@ -167,3 +167,16 @@ print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 
 # Save the model
 torch.save(model.state_dict(), 'mnist_cnn.pth')
+#%%
+# Train more
+model = CNNModel()
+model.load_state_dict(torch.load('mnist_cnn.pth'))
+train(model, train_loader, val_loader, criterion, optimizer, num_epochs=100)
+# Test the model
+test_loss, test_accuracy = evaluate(model, test_loader, criterion)
+print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
+
+# Save the model
+torch.save(model.state_dict(), 'mnist_cnn_1.pth')
+
+#%%
