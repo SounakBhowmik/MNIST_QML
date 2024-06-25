@@ -12,43 +12,6 @@ from torch.nn import Module
 from pennylane import numpy as np
 import math
 
-# Define the CNN model for binary classification with kernel size 8
-class ClassicalModel1(Module):
-    def __init__(self):
-        super(ClassicalModel1, self).__init__()
-        self.name = "ClassicalModel1"
-        # Input shape: -1, 1, 200, 200
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=4, stride = 2) # -1, 32, 99, 99
-        self.maxpool1 = nn.MaxPool2d(kernel_size=4, stride=2) # -1, 32, 48, 48
-
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=8, stride = 2) # -1, 64, 21, 21
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)     # -1, 64, 10, 10
-
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=4, stride = 2)            # -1, 128, 4, 4
-
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(128 * 4 * 4, 128)  # Adjusted based on the new feature dimensions
-        self.dropout1 = nn.Dropout(p=0.5)
-        self.fc2 = nn.Linear(128, 64)  # Output 2 value for binary classification
-        self.dropout2 = nn.Dropout(p=0.25)
-        self.fc3 = nn.Linear(64, 16)
-        self.fc4 = nn.Linear(16,2)
-
-    def forward(self, x):
-        x = self.maxpool1(torch.relu(self.conv1(x)))
-        x = self.maxpool2(torch.relu(self.conv2(x)))
-        x = torch.relu(self.conv3(x))
-
-        x = self.flatten(x)
-        x = self.dropout1(torch.relu(self.fc1(x)))
-        x = self.dropout2(torch.relu(self.fc2(x)))
-
-        x = torch.relu(self.fc3(x))
-
-        x = torch.log_softmax(self.fc4(x), dim=1)
-        return x
-
-    
 # Hybrid QNN ####################################################################################################
 class Q_linear(Module):
     in_features: int
@@ -84,69 +47,6 @@ class Q_linear(Module):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         return self.qlayer(input)
 
-### This is a class for using Quanvolution with any torch model
-class Q_conv(Module):
-    def __init__(self,  kernel_size: int, n_layers: int, stride: int, device=None, dtype=None)->None:
-        super(Q_conv, self).__init__()
-        self.kernel_size = kernel_size
-        self.n_qubits = int(self.kernel_size**2)
-        self.n_layers = n_layers
-        self.stride = stride
-        
-        # First define a q-node
-        weight_shapes = {"weights": (self.n_layers, self.n_qubits, 3)}
-        #init_method = {"weights": self.weights}
-        dev = qml.device("lightning.gpu", wires = self.n_qubits) if torch.cuda.is_available() else qml.device("default.qubit", wires = self.n_qubits)
-        #dev = qml.device("default.qubit", wires = n_qubits)
-
-        @qml.qnode(dev, interface="torch")
-        def quantum_circuit(inputs, weights):
-            #print(f"#################weights = {weights}#################")
-            '''
-            # Hadamard Layer # Increases complexity and time of training
-            for wire in range(n_qubits):
-                qml.Hadamard(wires = wire)
-            '''
-            # Embedding layer
-            qml.AngleEmbedding(inputs, wires=range(self.n_qubits))
-
-            # Variational layer
-            for _ in range(self.n_layers):
-                qml.StronglyEntanglingLayers(weights, wires=range(self.n_qubits))
-                
-            return [qml.expval(qml.PauliZ(wires=i)) for i in range(self.n_qubits)]
-
-        #self.qlayer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes, init_method)
-        self.qlayer = qml.qnn.TorchLayer(quantum_circuit, weight_shapes)
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-
-        # Assert the rules
-        assert len(input.shape) == 4                                                # (batch_size, n_channels, x_dim, y_dim)
-        assert input.shape[-1] == input.shape[-2]
-        assert self.stride > 0
-        assert input.shape[1] == 1                                                  # Supports only one channel only
-
-        k = self.kernel_size                                                             # kernel dimension
-        output = None
-        iterator = 0
-        output_shape = int((input.shape[-1]-k)/self.stride + 1)
-        #print(f"output_shape = {output_shape}\n")
-        for i in range(0, input.shape[-2], self.stride):
-            if(i+k > input.shape[-2]):
-                break
-            for j in range(0, input.shape[-1], self.stride):
-                if(j+k > input.shape[-1]):
-                    break
-                x = torch.flatten(input[:,:, i:i+k, j:j+k], start_dim=1)
-                exp_vals = self.qlayer(x).view(input.shape[0], self.n_qubits, 1)
-                if(iterator>0):
-                    output = torch.cat((output, exp_vals), -1)
-                else:
-                    output = exp_vals
-                iterator +=1
-        output = torch.reshape(output, (output.shape[0], output.shape[1], output_shape, output_shape))
-        return output
 
 
 class DressedQuantumNet(nn.Module):
