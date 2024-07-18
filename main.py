@@ -26,7 +26,7 @@ import numpy as np
 from Models import QConv2D_AE, Q_linear
 
 # Hyperparameters
-batch_size = 64
+batch_size = 32
 learning_rate = 0.001
 num_epochs = 100
 
@@ -78,50 +78,14 @@ val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 test_loader = data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Define the CNN model
-class CNNModel(nn.Module):
-    def __init__(self):
-        super(CNNModel, self).__init__()
-        self.qconv1 = QConv2D_AE(1, 4, 1, 1) # 4, 25, 25
-        self.qconv2 = QConv2D_AE(4, 4, 1, 1) # 6, 9, 9
-        self.qconv3 = QConv2D_AE(6, 3, 1, 1) # 6, 2, 2
-        
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        
-        self.clinear = nn.Linear(6*2*2, 10)
-        self.qlinear = Q_linear(10, 2)
-        
-        '''
-        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.fc1 = nn.Linear(128 * 3 * 3, 256)
-        self.fc2 = nn.Linear(256, 128)
-        self.fc3 = nn.Linear(128, 10)
-        self.dropout = nn.Dropout(0.5)
-        '''
-    def forward(self,x):
-        x = self.pool(torch.relu(self.qconv1(x))) # 4, 12, 12
-        x = self.pool(torch.relu(self.qconv2(x))) # 6, 4, 4
-        x = torch.relu(self.qconv3(x))            # 6, 2, 2
-        x = x.view(-1, 6 * 2 * 2)
-        x = torch.relu(self.clinear(x))
-        x = torch.log_softmax(x, dim=1)
-        return x
-        
-    def forward_(self, x):
-        x = self.pool(torch.relu(self.conv1(x)))
-        x = self.pool(torch.relu(self.conv2(x)))
-        x = self.pool(torch.relu(self.conv3(x)))
-        x = x.view(-1, 128 * 3 * 3)
-        x = torch.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return x
+#%%
+import pennylane as qml
+ionQ_dev = qml.device('ionq.simulator', wires=2, shots=1024, api_key='z91NPV3A3PEc7zE1Uh9Vaw4Q4DNFAJoR')
+#%%
+from QNNModels import QNNModel_1
 
 # Initialize the model, loss function, and optimizer
-model = CNNModel()
+model = QNNModel_1()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 

@@ -22,7 +22,7 @@ class Q_linear(Module):
         super().__init__()
         self.in_features = in_features
         self.n_layers = n_layers
-        self.dev = qml.device("lightning.gpu", wires = in_features) if torch.cuda.is_available() else qml.device("default.qubit", wires = in_features)
+        self.dev = (qml.device("lightning.gpu", wires = in_features) if torch.cuda.is_available() else qml.device("default.qubit", wires = in_features)) if device == None else device
 
         @qml.qnode(self.dev, interface="torch")
         def quantum_circuit(inputs, weights):
@@ -95,16 +95,11 @@ class QConv2D(nn.Module):
 
         # First define a q-node
         weight_shapes = {"weights": (self.n_layers, self.n_qubits, 3)}
-        dev = qml.device("lightning.gpu", wires = self.n_qubits) if torch.cuda.is_available() else qml.device("default.qubit", wires = self.n_qubits)
+        dev = device if (device is not None) else qml.device("lightning.gpu", wires = self.n_qubits) if torch.cuda.is_available() else qml.device("default.qubit", wires = self.n_qubits)
         qnode = qml.QNode(self.quantum_circuit, dev, interface="torch")
         self.qlayer = qml.qnn.TorchLayer(qnode, weight_shapes)
 
     def quantum_circuit(self, inputs, weights):
-            '''
-            # Hadamard Layer # Increases complexity and time of training
-            for wire in range(n_qubits):
-                qml.Hadamard(wires = wire)
-            '''
             # Embedding layer
             qml.AngleEmbedding(inputs, wires=range(self.n_qubits))
 
@@ -202,7 +197,7 @@ class QConv2D_AE(nn.Module):
         return output
 
 
-#%% Full-fledged quanvolution with amplitude encoding
+#%% Full-fledged quanvolution with multiple filters
 class QConv2D_MF(nn.Module):
     '''
         It will be able to use multiple VQCs, aka multiple filters
@@ -217,7 +212,7 @@ class QConv2D_MF(nn.Module):
 
         # First define a q-node
         weight_shapes = {"weights": (self.n_layers, self.n_qubits, 3)}
-        dev = qml.device("lightning.gpu", wires = self.n_qubits) if torch.cuda.is_available() else qml.device("default.qubit", wires = self.n_qubits)
+        dev = (qml.device("lightning.gpu", wires = self.n_qubits) if torch.cuda.is_available() else qml.device("default.qubit", wires = self.n_qubits)) if device == None else device
         self.qfilters = []
         for _ in range(self.filters):
             qnode = qml.QNode(self.quantum_circuit, dev, interface="torch")
