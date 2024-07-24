@@ -11,7 +11,7 @@ test_data_file = "../Datasets/MNIST/mnist_test.csv"
 
 import pandas as pd
 train = pd.read_csv(test_data_file)
-print(train.head())
+#print(train.head())
 
 
 #%%
@@ -80,7 +80,7 @@ test_loader = data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False
 # Define the CNN model
 #%%
 import pennylane as qml
-ionQ_dev = qml.device('ionq.simulator', wires=2, shots=1024, api_key='z91NPV3A3PEc7zE1Uh9Vaw4Q4DNFAJoR')
+#ionQ_dev = qml.device('ionq.simulator', wires=2, shots=1024, api_key='z91NPV3A3PEc7zE1Uh9Vaw4Q4DNFAJoR')
 #%%
 from QNNModels import QNNModel_1
 
@@ -89,9 +89,10 @@ model = QNNModel_1()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
+from tqdm import tqdm
 # Training the model
 def train(model, train_loader, val_loader, criterion, optimizer, num_epochs):
-    for epoch in range(num_epochs):
+    for epoch in tqdm(range(num_epochs)):
         model.train()
         running_loss = 0.0
         for images, labels in train_loader:
@@ -132,6 +133,7 @@ print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 # Save the model
 torch.save(model.state_dict(), 'mnist_cnn.pth')
 #%%
+'''
 # Train more
 model = CNNModel()
 model.load_state_dict(torch.load('mnist_cnn.pth'))
@@ -144,3 +146,4 @@ print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 torch.save(model.state_dict(), 'mnist_cnn_1.pth')
 
 #%%
+'''
