@@ -5,16 +5,12 @@ Created on Fri Jun 14 18:41:03 2024
 
 @author: sounakbhowmik
 """
-
 train_data_file = "../Datasets/MNIST/mnist_train.csv"
 test_data_file = "../Datasets/MNIST/mnist_test.csv"
-
-import pandas as pd
-train = pd.read_csv(test_data_file)
-#print(train.head())
-
-
-#%%
+#----------------------------------------------------------------------------------------------------
+import torch
+from torchsummary import summary
+import torch.nn as nn
 import torch
 import torch.nn as nn
 #import torch.functional as F
@@ -78,8 +74,8 @@ train_loader = data.DataLoader(train_dataset, batch_size=batch_size, shuffle=Tru
 val_loader = data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 test_loader = data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-# Define the CNN model
 #%%
+
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
@@ -101,71 +97,70 @@ class CNN(nn.Module):
         return x
 
 #%%
-import pennylane as qml
-#ionQ_dev = qml.device('ionq.simulator', wires=2, shots=1024, api_key='z91NPV3A3PEc7zE1Uh9Vaw4Q4DNFAJoR')
-#%%
-from QNNModels import QNNModel_1
+classical_model = CNN()
+classical_model.load_state_dict(torch.load('mnist_cnn.pth'))
+classical_model.eval()
 
-# Initialize the model, loss function, and optimizer
-model = CNN()
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+#print(summary(classical_model, (1,28,28)))
+
+#%%
+'''
+In this section we shall develop a function that will take,
+    1) the classical model
+    2) dataloaders
+as INPUT
+It will output,
+    1) A dict
+        --> {'layer_i_op': tensor} for i in n_layers
+'''
 
 from tqdm import tqdm
-# Training the model
-def train(model, train_loader, val_loader, criterion, optimizer, num_epochs):
-    for epoch in tqdm(range(num_epochs)):
-        model.train()
-        running_loss = 0.0
-        for images, labels in train_loader:
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
 
-        val_loss, val_accuracy = evaluate(model, val_loader, criterion)
-        print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {running_loss / len(train_loader):.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_accuracy:.4f}")
+def get_layerwise_op(train_loader, classical_model):
+    op = {'conv1_op':torch.empty(0), 
+          'conv2_op': torch.empty(0), 
+          'flattened_ip': torch.empty(0), 
+          'preds': torch.empty(0)}
+    for images, labels in tqdm(train_loader):
+        x = classical_model.conv1(images)
+        if(len(op['conv1_op']) == 0):
+            op['conv1_op'] = x
+        else:
+            op['conv1_op'] = torch.cat((op['conv1_op'], x), dim=0)
+            
+        x = classical_model.conv2(classical_model.pool1(torch.relu(x)))
+        if(len(op['conv2_op']) == 0):
+            op['conv2_op'] = x
+        else:
+            op['conv2_op'] = torch.cat((op['conv2_op'], x), dim=0)
+            
+        x = classical_model.pool2(torch.relu(x)).view(-1, 16 * 4 * 4)
+        if(len(op['flattened_ip']) == 0):
+            op['flattened_ip'] = x
+        else:
+            op['flattened_ip'] = torch.cat((op['flattened_ip'], x), dim=0)
+            
+        
+        if(len(op['preds']) == 0):
+            op['preds'] = labels
+        else:
+            op['preds'] = torch.cat((op['preds'], labels), dim=0)
+            
+    return op
 
-# Evaluating the model
-def evaluate(model, loader, criterion):
-    model.eval()
-    total_loss = 0.0
-    correct = 0
-    with torch.no_grad():
-        for images, labels in loader:
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            total_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            correct += (predicted == labels).sum().item()
+output_dir = get_layerwise_op(train_loader, classical_model)
 
-    avg_loss = total_loss / len(loader)
-    accuracy = correct / len(loader.dataset)
-    return avg_loss, accuracy
 
-# Train and evaluate the model
-train(model, train_loader, val_loader, criterion, optimizer, num_epochs=50)
+            
+        
+        
 
-# Test the model
-test_loss, test_accuracy = evaluate(model, test_loader, criterion)
-print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 
-# Save the model
-torch.save(model.state_dict(), 'mnist_cnn.pth')
-#%%
-'''
-# Train more
-model = CNNModel()
-model.load_state_dict(torch.load('mnist_cnn.pth'))
-train(model, train_loader, val_loader, criterion, optimizer, num_epochs=100)
-# Test the model
-test_loss, test_accuracy = evaluate(model, test_loader, criterion)
-print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
 
-# Save the model
-torch.save(model.state_dict(), 'mnist_cnn_1.pth')
 
-#%%
-'''
+
+
+
+
+
+
