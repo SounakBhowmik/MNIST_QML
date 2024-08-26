@@ -83,18 +83,18 @@ test_loader = data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False
 class CNN(nn.Module):
     def __init__(self):
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels= 1, out_channels=8, kernel_size=5) #8, 24, 24
-        self.pool1 = nn.MaxPool2d(2, 2)  #8, 12, 12
-        self.conv2 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=5)#16, 8, 8
-        self.pool2 = nn.MaxPool2d(2, 2)  #16, 4, 4
-        self.fc1 = nn.Linear(16 * 4 * 4, 120)
+        self.conv1 = nn.Conv2d(in_channels= 1, out_channels=8, kernel_size = 2) #8, 27, 27
+        self.pool1 = nn.MaxPool2d(2, 2)  #8, 13, 13
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=14, kernel_size = 4, stride = 2) #15, 5, 5
+        self.pool2 = nn.MaxPool2d(2, 1)  #16, 4, 4
+        self.fc1 = nn.Linear(14 * 4 * 4, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
         x = self.pool1(torch.relu(self.conv1(x)))
         x = self.pool2(torch.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 4 * 4)
+        x = x.view(-1, 14 * 4 * 4)
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
         x = torch.log_softmax(self.fc3(x), dim=1)
@@ -104,7 +104,7 @@ class CNN(nn.Module):
 import pennylane as qml
 #ionQ_dev = qml.device('ionq.simulator', wires=2, shots=1024, api_key='z91NPV3A3PEc7zE1Uh9Vaw4Q4DNFAJoR')
 #%%
-from QNNModels import QNNModel_1
+#from QNNModels import QNNModel_1
 
 # Initialize the model, loss function, and optimizer
 model = CNN()
