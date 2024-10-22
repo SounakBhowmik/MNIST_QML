@@ -1,0 +1,3 @@
+[submodule "Quantum_convolution"]
+    url = https://github.com/SounakBhowmik/Quantum_convolution.git
+    path = Quantum_convolution
