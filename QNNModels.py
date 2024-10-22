@@ -6,35 +6,63 @@ Created on Thu Jul 18 18:06:00 2024
 """
 import torch
 import torch.nn as nn
-from Models import QConv2D, QConv2D_AE, QConv2D_MF, Q_linear
+#from Models import QConv2D, QConv2D_AE, QConv2D_MF, Q_linear
+from Quantum_convolution.QNN import Quanv2D_multi_filter, amplitude_embedding, angle_embedding, test_quanv, DressedQuantumNet
+from Quantum_convolution.VQCs import vqc_num_params_dict
+import pennylane as qml
+import math
+import torch.nn as nn
 
 
-class QNNModel_1(nn.Module):
-    
-    '''
-        Used Angle embedding; Strongly entangling layers; 1 Qc layer (9 qubbits, 3x3 filter, strongly entangled circuit) + dense layer at the end.
-    
-    '''
-    def __init__(self, device=None):
-        super(QNNModel_1, self).__init__()
-        self.qconv1 = QConv2D(in_channels=1, kernel_size=3, n_layers=1, stride=2, device=device) # 9, 13, 13
+class QCONV_011(nn.Module):
+    def __init__(self):
+        super(QCONV_011, self).__init__()
         
-        self.pool = nn.MaxPool2d(kernel_size=4, stride=2)
+        # First QConv layer <-- ip: (n, 1, 28, 28)
+        VQC_circuit, VQC_num_params = vqc_num_params_dict[0]
+        self.qconv1 = Quanv2D_multi_filter(in_channels = 1, kernel_size=2, stride=2, embedding=angle_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 2, VQC_num_params = VQC_num_params, n_filters = 8)
+        # --> op: (n, 8, 14, 14)
         
-        self.fc1 = nn.Linear(9 * 5 * 5, 32)
-        self.fc2 = nn.Linear(32, 16)
-        self.fc3 = nn.Linear(16, 10)
+        # 2nd QConv
+        VQC_circuit, VQC_num_params = vqc_num_params_dict[1]
+        self.qconv2 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 2, VQC_num_params = VQC_num_params, n_filters = 8)
+        # --> op: (n, 8, 7, 7)
         
-    def forward(self,x):
-        x = self.pool(self.qconv1(x)) # 9, 5, 5
-	
-        x = torch.relu(x)
-       
-        x = x.view(-1, 9 * 5 * 5)
+        # 3rd Qconv
+        VQC_circuit, VQC_num_params = vqc_num_params_dict[1]
+        self.qconv3 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 4, VQC_num_params = VQC_num_params, n_filters = 4)
+        # --> op: (n, 4, 3, 3)
         
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = torch.log_softmax(self.fc3(x), dim=1)
+        # reverse MERA
+        self.dqn = DressedQuantumNet(input_shape= 4*3*3, n_op = 10)
         
+    def forward(self, x):
+        x = self.qconv1(x)
+        x = self.qconv2(x)
+        x = self.qconv3(x)
+        
+        x = torch.flatten(x, start_dim=1)
+        
+        x = self.dqn(x)
         return x
+
+#%%       
+        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
         
