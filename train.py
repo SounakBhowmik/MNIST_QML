@@ -7,7 +7,6 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 from torch.utils.data import DataLoader, TensorDataset
 from sklearn.preprocessing import LabelEncoder
 import os
-import cv2
 import numpy as np
 import math
 from tqdm import tqdm
@@ -25,15 +24,19 @@ def data_reshape(X, shape):
 
 
 # Function to load data from CSV and preprocess it
-def load_data(csv_path):
+def load_data(npz_path):
+    '''
     df = pd.read_csv(csv_path)
     X = df.drop('label', axis=1).values  # Assuming 'label' is the target column
     y = LabelEncoder().fit_transform(df['label'].values)
     return X, y
+    '''
+    data = np.load(npz_path)
+    return data['x'], data['y']
 
 # Function to get DataLoader from the dataset
 def get_dataloader(X, y, batch_size=32):
-    dataset = TensorDataset(torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.long))
+    dataset = TensorDataset(torch.tensor(X.unsqueeze(1), dtype=torch.float32), torch.tensor(y, dtype=torch.long))
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 # Simple feedforward neural network model

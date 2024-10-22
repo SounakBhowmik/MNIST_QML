@@ -10,17 +10,15 @@ from QNNModels import QCONV_011
 
 DEBUG = False
 
-train_set_path = '../Datasets/MNIST/split_datasets/train.csv'
-val_set_path = '../Datasets/MNIST/split_datasets/val.csv'
-test_set_path = '../Datasets/MNIST/split_datasets/test.csv'
+train_set_path = '../Datasets/MNIST/small_MNIST/train.npz'
+val_set_path = '../Datasets/MNIST/small_MNIST/val.npz'
+test_set_path = '../Datasets/MNIST/small_MNIST/test.npz'
 
 model_name = "QCONV_011"
 
 
 MAX_X_VAL = 255.0
 BATCH_SIZE = 25
-DATA_SHAPE = (1,28,28)
-#DATA_RESHAPE = (17,17)
 
 # Main function to execute the entire workflow
 def main():
@@ -47,10 +45,6 @@ def main():
     X_test = scaler.transform(X_test)
     '''
     
-    X_train = data_reshape(X_train, DATA_SHAPE)
-    X_val = data_reshape(X_val, DATA_SHAPE)
-    X_test = data_reshape(X_test, DATA_SHAPE)
-    
     # Create DataLoaders
     train_loader = get_dataloader(X_train, y_train, batch_size=BATCH_SIZE)
     val_loader = get_dataloader(X_val, y_val, batch_size=BATCH_SIZE)
@@ -63,7 +57,8 @@ def main():
     data_iter = iter(train_loader)  
     data_batch, labels_batch = next(data_iter)
     input_shape = data_batch.shape
-    #visualize(data_batch[10])
+    visualize(data_batch[10])
+    return 
     
     
     num_classes = len(set(y_train))

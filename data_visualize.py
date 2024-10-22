@@ -14,6 +14,9 @@ def visualize(X):
     except:
         raise Exception('Data shape mismatch!')
 
+
+
+'''
 #%%
 train_set_path = '../Datasets/MNIST/split_datasets/train.csv'
 X_train, y_train = load_data(os.path.join(train_set_path))
@@ -27,7 +30,6 @@ plt.imshow(X_train[0].reshape(28,28))
 
 
 
-'''
 root_data_path = '../Datasets/MNIST/split_datasets'
 
 train = pd.read_csv(os.path.join(root_data_path, 'train.csv'))
