@@ -12,6 +12,7 @@ from Quantum_convolution.VQCs import vqc_num_params_dict
 import pennylane as qml
 import math
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class QCONV_011(nn.Module):
@@ -23,23 +24,29 @@ class QCONV_011(nn.Module):
         self.qconv1 = Quanv2D_multi_filter(in_channels = 1, kernel_size=2, stride=2, embedding=angle_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 2, VQC_num_params = VQC_num_params, n_filters = 8)
         # --> op: (n, 8, 14, 14)
         
+        self.bn1 = nn.BatchNorm2d(8)
+        
         # 2nd QConv
         VQC_circuit, VQC_num_params = vqc_num_params_dict[1]
         self.qconv2 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 2, VQC_num_params = VQC_num_params, n_filters = 8)
         # --> op: (n, 8, 7, 7)
+        
+        self.bn2 = nn.BatchNorm2d(8)
         
         # 3rd Qconv
         VQC_circuit, VQC_num_params = vqc_num_params_dict[1]
         self.qconv3 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 4, VQC_num_params = VQC_num_params, n_filters = 4)
         # --> op: (n, 4, 3, 3)
         
+        self.bn3 = nn.BatchNorm2d(4)
+        
         # reverse MERA
         self.dqn = DressedQuantumNet(input_shape= 4*3*3, n_op = 10)
         
     def forward(self, x):
-        x = self.qconv1(x)
-        x = self.qconv2(x)
-        x = self.qconv3(x)
+        x = F.relu(self.bn1(self.qconv1(x)))
+        x = F.relu(self.bn2(self.qconv2(x)))
+        x = F.relu(self.bn3(self.qconv3(x)))
         
         x = torch.flatten(x, start_dim=1)
         

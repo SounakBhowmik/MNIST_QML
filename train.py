@@ -10,6 +10,7 @@ import os
 import numpy as np
 import math
 from tqdm import tqdm
+import torch.nn.functional as F
 
 DEBUG = False
 
@@ -36,43 +37,95 @@ def load_data(npz_path):
 
 # Function to get DataLoader from the dataset
 def get_dataloader(X, y, batch_size=32):
-    dataset = TensorDataset(torch.tensor(X.unsqueeze(1), dtype=torch.float32), torch.tensor(y, dtype=torch.long))
+    dataset = TensorDataset(torch.tensor(X, dtype=torch.float32).unsqueeze(1), torch.tensor(y, dtype=torch.long))
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
+class BinaryMNISTClassifier(nn.Module):
+    def __init__(self):
+        super(BinaryMNISTClassifier, self).__init__()
+        
+        # First convolutional layer
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        
+        # Second convolutional layer
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        # Third convolutional layer
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
+        
+        # Fully connected layer
+        self.fc1 = nn.Linear(128, 64)
+        self.fc2 = nn.Linear(64, 2)
+        
+        # Dropout layers
+        self.dropout = nn.Dropout(p=0.5)
+
+    def forward(self, x):
+        # Convolutional layers with batch norm, ReLU, and dropout
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.max_pool2d(x, 2)
+        x = F.dropout(x, p=0.25, training=self.training)
+        
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.max_pool2d(x, 2)
+        x = F.dropout(x, p=0.25, training=self.training)
+        
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = F.adaptive_avg_pool2d(x, (1, 1))  # Global average pooling
+        x = x.view(x.size(0), -1)
+        
+        # Fully connected layers with dropout
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = torch.log_softmax(self.fc2(x), 1)  # Output layer with sigmoid activation
+        
+        return x
+    
+    
+    
 # Simple feedforward neural network model
 class SimpleNN(nn.Module):
     def __init__(self, input_shape, num_classes):
         super(SimpleNN, self).__init__()
-        kernel_size = 4
-        stride = 2
-        op_channels = 10
-        self.conv1 = nn.Conv2d(input_shape[1], op_channels, kernel_size, stride)
-        op_d = (input_shape[2] - kernel_size) // stride  + 1
-        self.fc1 = nn.Linear( op_d * op_d * op_channels,  64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, num_classes)
+
+        self.conv1 = nn.Conv2d(1, 8, 4, 2) # 8,13,13
+        
+        
+        self.conv2 = nn.Conv2d(8, 16, 8, 2) # 16,3,3
+        
+        #op_d = (input_shape[2] - kernel_size) // stride  + 1
+        self.fc1 = nn.Linear(16 * 3 * 3,  64)
+        self.fc2 = nn.Linear(64, num_classes)
+        self.dropout = nn.Dropout(p=0.5)
+        #self.fc2 = nn.Linear(32, num_classes)
+        #self.fc3 = nn.Linear(32, num_classes)
 
     def forward(self, x):
         x = torch.relu(self.conv1(x))
+        x = torch.relu(self.conv2(x))
         if(DEBUG):
             print(f'shape after conv1 is {x.shape}')
         x = torch.flatten(x, start_dim=1)
         if(DEBUG):
             print(f'shape after flatten is {x.shape}')
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.relu(self.dropout(self.fc1(x)))
+        x = torch.log_softmax(self.fc2(x), dim=1)
+        #x = torch.relu(self.fc2(x))
+        #x = self.fc3(x)
         return x
 
 # Function to train the model and evaluate it on validation set
-def train_model(train_loader, val_loader, model, criterion, optimizer, num_epochs, device):
+def train_model(train_loader, val_loader, test_loader, model, criterion, optimizer, num_epochs, device, num_classes):
     logs = {
         'epoch': [], 'train_loss': [], 'val_loss': [],
         'train_acc': [], 'val_acc': [],
         'val_precision': [], 'val_recall': [], 'val_f1': []
     }
 
-    for epoch in tqdm(range(num_epochs)):
+    for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
         correct, total = 0, 0
@@ -82,24 +135,29 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, num_epoch
             
             inputs, labels = inputs.to(device), labels.to(device)
             if(DEBUG):
-                print(f'input shape={inputs.shape}')
+                print(f'input shape={inputs.shape}, labels shape = {labels.shape}')
 
             optimizer.zero_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, torch.eye(num_classes)[labels.int()])
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
             _, predicted = torch.max(outputs, 1)
+            if(DEBUG):
+                print(f'predictions = {predicted}')
+                #break
             total += labels.size(0)
+            if(DEBUG):
+                print(f'total += {labels.size(0)}')
             correct += (predicted == labels).sum().item()
 
         train_loss = running_loss / len(train_loader)
         train_acc = 100 * correct / total
 
         # Validation loop
-        val_loss, val_acc, val_precision, val_recall, val_f1 = evaluate_model(val_loader, model, criterion, device)
+        _, val_loss, val_acc, val_precision, val_recall, val_f1 = evaluate_model(val_loader, model, criterion, device, num_classes)
 
         # Logging the epoch results
         logs['epoch'].append(epoch + 1)
@@ -110,13 +168,17 @@ def train_model(train_loader, val_loader, model, criterion, optimizer, num_epoch
         logs['val_precision'].append(val_precision)
         logs['val_recall'].append(val_recall)
         logs['val_f1'].append(val_f1)
+        
+        _, test_loss, test_acc, test_precision, test_recall, test_f1 = evaluate_model(test_loader, model, criterion, device, num_classes)
 
-        print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}%')
-
+        print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%')
+        #test_predictions = get_test_predictions(test_loader, model, device)
+        #test_metrics = calculate_test_metrics(y_test, test_predictions)
+        
     return logs
 
 # Function to evaluate the model on the validation set
-def evaluate_model(data_loader, model, criterion, device):
+def evaluate_model(data_loader, model, criterion, device, num_classes):
     model.eval()
     running_loss = 0.0
     correct, total = 0, 0
@@ -127,7 +189,7 @@ def evaluate_model(data_loader, model, criterion, device):
             inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, torch.eye(num_classes)[labels.int()])
             running_loss += loss.item()
 
             _, predicted = torch.max(outputs, 1)
@@ -143,7 +205,7 @@ def evaluate_model(data_loader, model, criterion, device):
     recall = recall_score(all_labels, all_preds, average='weighted')
     f1 = f1_score(all_labels, all_preds, average='weighted')
 
-    return loss, accuracy, precision, recall, f1
+    return all_preds, loss, accuracy, precision, recall, f1
 
 # Function to get test predictions
 def get_test_predictions(test_loader, model, device):
@@ -173,17 +235,18 @@ def save_logs_to_excel(logs, test_predictions, output_dir):
     print(f"Logs and test predictions saved to {excel_path}.")
 
 # Function to calculate test metrics (accuracy, precision, recall, f1) using test predictions
-def calculate_test_metrics(test_labels, test_predictions):
-    accuracy = accuracy_score(test_labels, test_predictions) * 100
-    precision = precision_score(test_labels, test_predictions, average='weighted')
-    recall = recall_score(test_labels, test_predictions, average='weighted')
-    f1 = f1_score(test_labels, test_predictions, average='weighted')
+def calculate_test_metrics(test_loader,  model, criterion, device, num_classes):
+    
+    test_predictions, test_loss, test_acc, test_precision, test_recall, test_f1 = evaluate_model(test_loader, model, criterion, device, num_classes)
+    
 
-    return {
-        'Test Accuracy': accuracy,
-        'Test Precision': precision,
-        'Test Recall': recall,
-        'Test F1 Score': f1
+    print(f'test_accuracy: {test_acc}')
+    return test_predictions, {
+        'Test Loss': test_loss,
+        'Test Accuracy': test_acc,
+        'Test Precision': test_precision,
+        'Test Recall': test_recall,
+        'Test F1 Score': test_f1
     }
 
 
