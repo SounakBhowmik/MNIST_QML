@@ -35,13 +35,13 @@ class QCONV_011(nn.Module):
         
         # 3rd Qconv
         VQC_circuit, VQC_num_params = vqc_num_params_dict[1]
-        self.qconv3 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 4, VQC_num_params = VQC_num_params, n_filters = 4)
+        self.qconv3 = Quanv2D_multi_filter(in_channels = 8, kernel_size=2, stride=2, embedding=amplitude_embedding, VQC_circuit = VQC_circuit, VQC_n_layers = 2, VQC_num_params = VQC_num_params, n_filters = 8)
         # --> op: (n, 4, 3, 3)
         
-        self.bn3 = nn.BatchNorm2d(4)
+        self.bn3 = nn.BatchNorm2d(8)
         
-        # reverse MERA
-        self.dqn = DressedQuantumNet(input_shape= 4*3*3, n_op = 10)
+        # dressed quantum network
+        self.dqn = DressedQuantumNet(input_shape= 8*3*3, n_op = 2)
         
     def forward(self, x):
         x = F.relu(self.bn1(self.qconv1(x)))

@@ -124,16 +124,16 @@ def train_model(train_loader, val_loader, test_loader, model, criterion, optimiz
         'train_acc': [], 'val_acc': [],
         'val_precision': [], 'val_recall': [], 'val_f1': []
     }
-
+    
     for epoch in range(num_epochs):
+        print(f"Epoch {epoch}")
         model.train()
         running_loss = 0.0
         correct, total = 0, 0
 
         # Training loop
-        for inputs, labels in train_loader:
-            
-            inputs, labels = inputs.to(device), labels.to(device)
+        for inputs, labels in tqdm(train_loader):
+            #inputs, labels = inputs.to(device), labels.to(device) # Turn on while using GPU
             if(DEBUG):
                 print(f'input shape={inputs.shape}, labels shape = {labels.shape}')
 
@@ -169,9 +169,10 @@ def train_model(train_loader, val_loader, test_loader, model, criterion, optimiz
         logs['val_recall'].append(val_recall)
         logs['val_f1'].append(val_f1)
         
-        _, test_loss, test_acc, test_precision, test_recall, test_f1 = evaluate_model(test_loader, model, criterion, device, num_classes)
+        print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}')
+        #_, test_loss, test_acc, test_precision, test_recall, test_f1 = evaluate_model(test_loader, model, criterion, device, num_classes)
 
-        print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%')
+        #print(f'Epoch {epoch + 1}/{num_epochs}, Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, Val Accuracy: {val_acc:.2f}, Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.2f}%')
         #test_predictions = get_test_predictions(test_loader, model, device)
         #test_metrics = calculate_test_metrics(y_test, test_predictions)
         

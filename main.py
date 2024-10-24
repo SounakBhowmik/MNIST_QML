@@ -4,8 +4,6 @@ import torch.optim as optim
 from sklearn.preprocessing import StandardScaler
 import os
 from train import load_data, get_dataloader, SimpleNN, train_model, evaluate_model, get_test_predictions, save_logs_to_excel, calculate_test_metrics, save_test_metrics_to_excel, data_reshape   , BinaryMNISTClassifier      
-import numpy as np
-from data_visualize import visualize
 from QNNModels import QCONV_011
 
 DEBUG = False
@@ -27,8 +25,8 @@ class_considered = 0
 train_set_path = f'../Datasets/MNIST/binary_one_vs_all/bin_{class_considered}/train.npz'
 val_set_path = f'../Datasets/MNIST/binary_one_vs_all/bin_{class_considered}/val.npz'
 test_set_path = f'../Datasets/MNIST/binary_one_vs_all/bin_{class_considered}/test.npz'
-'''
 
+'''
 train_set_path = '../Datasets/MNIST/multi_class/train.npz'
 val_set_path = '../Datasets/MNIST/multi_class/val.npz'
 test_set_path = '../Datasets/MNIST/multi_class/test.npz'
@@ -42,19 +40,18 @@ BATCH_SIZE = 25
 
 
 # Paths to your dataset
-output_dir = 'results'
+output_dir = '/results'
 
 # Load data
 X_train, y_train = load_data(os.path.join(train_set_path))
-
 X_val, y_val = load_data(os.path.join(val_set_path))
 X_test, y_test = load_data(os.path.join(test_set_path))
 
 
 # Pull the values within [0,1]
-X_train = X_train/MAX_X_VAL 
-X_val = X_val/MAX_X_VAL 
-X_test = X_test/MAX_X_VAL 
+X_train = X_train/MAX_X_VAL * torch.pi /2
+X_val = X_val/MAX_X_VAL * torch.pi /2
+X_test = X_test/MAX_X_VAL * torch.pi /2
 
 '''
 #%%
@@ -74,7 +71,7 @@ X_train = (X_train - mean) / std
 X_val = (X_val - mean) / std
 X_test = (X_test - mean) / std
 '''
-#%%
+
 # Create DataLoaders
 train_loader = get_dataloader(X_train, y_train, batch_size=BATCH_SIZE)
 val_loader = get_dataloader(X_val, y_val, batch_size=BATCH_SIZE)
@@ -90,30 +87,21 @@ input_shape = data_batch.shape
 #visualize(data_batch[10])
 
 
-#%%
 
 num_classes = len(set(y_train))
-model = SimpleNN(input_shape, num_classes).to(device)
+#model = SimpleNN(input_shape, num_classes).to(device)
 #model = BinaryMNISTClassifier().to(device)
-#model = QCONV_011()
+model = QCONV_011()
 
-criterion = nn.MSELoss()
+criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 #optimizer = optim.SGD(model.parameters(), lr=0.000001)
 #optimizer = optim.RMSprop(model.parameters(), lr=0.000001)
 
-
-# Train the model and log the training process
-num_epochs = 5
-logs = train_model(train_loader, val_loader, test_loader, model, criterion, optimizer, num_epochs, device, num_classes)
 #%%
-
-'''
-# Get test predictions
-test_predictions = get_test_predictions(test_loader, model, device)
-if(DEBUG):
-    print(f'test predictions look like {test_predictions}')
-'''
+# Train the model and log the training process
+num_epochs = 20
+logs = train_model(train_loader, val_loader, test_loader, model, criterion, optimizer, num_epochs, device, num_classes)
 
 
 # Calculate test metrics using test predictions and true labels
